@@ -25,15 +25,11 @@ bool get_mask(acl_t acl, acl_permset_t *perms) {
   return false;
 }
 
-void get_file_owner_and_group(const char *file, char *user, char *group) {
+void get_file_owner_and_group(const char *file, uid_t *owner, gid_t *group) {
   struct stat stats;
   stat(file, &stats);
-  uid_t uid = stats.st_uid;
-  gid_t gid = stats.st_gid;
-  struct passwd *pw = getpwuid(uid);
-  strcpy(user, pw->pw_name);
-  struct group *grp = getgrgid(gid);
-  strcpy(group, grp->gr_name);
+  *owner = stats.st_uid;
+  *group = stats.st_gid;
 }
 
 void print_perms(acl_permset_t perms, acl_permset_t *mask_perms) {
@@ -66,15 +62,26 @@ int main(int argc, char *argv[]) {
   }
 
   const char *user_or_group = argv[1];
-  bool user_else_group = strcmp(user_or_group, "u");
+  bool user_else_group = strcmp(user_or_group, "u") == 0;
   const char *name = argv[2];
+  uid_t user;
+  gid_t group;
+  if (user_else_group) {
+    user = getpwnam(name)->pw_uid;
+  } else {
+    group = getgrnam(name)->gr_gid;
+  }
+
   const char *file = argv[3];
-  char owner[256];
-  char group[256];
-  get_file_owner_and_group(file, owner, group);
+  uid_t file_owner;
+  gid_t file_group;
+  get_file_owner_and_group(file, &file_owner, &file_group);
+
   const acl_t acl = acl_get_file(file, ACL_TYPE_ACCESS);
+
   acl_permset_t mask_perms;
   bool has_mask = get_mask(acl, &mask_perms);
+  acl_permset_t *mask = has_mask ? &mask_perms : NULL;
 
   int entryId;
   for (entryId = ACL_FIRST_ENTRY;; entryId = ACL_NEXT_ENTRY) {
@@ -83,24 +90,43 @@ int main(int argc, char *argv[]) {
       break;
     }
     acl_tag_t tag;
+    acl_get_tag_type(entry, &tag);
+
     acl_permset_t perms;
+    uid_t *this_user;
+    gid_t *this_group;
     switch (tag) {
     case ACL_USER_OBJ:
-      if (user_else_group && strcmp(name, owner) == 0) {
+      if (user_else_group && file_owner == user) {
         acl_get_permset(entry, &perms);
         print_perms(perms, NULL);
         return 0;
       }
       break;
+    case ACL_USER:
+      this_user = acl_get_qualifier(entry);
+      if (user_else_group && (*this_user == user)) {
+        acl_get_permset(entry, &perms);
+        print_perms(perms, mask);
+        return 0;
+      }
+      break;
+    case ACL_GROUP_OBJ:
+      if (!user_else_group && file_group == group) {
+        acl_get_permset(entry, &perms);
+        print_perms(perms, mask);
+        return 0;
+      }
+      break;
+    case ACL_GROUP:
+      this_group = acl_get_qualifier(entry);
+      if (!user_else_group && *this_group == group) {
+        acl_get_permset(entry, &perms);
+        print_perms(perms, mask);
+        return 0;
+      }
+      break;
     }
-  case ACL_USER:
-    if (user_else_group && strcmp(name, owner) == 0) {
-      acl_get_permset(entry, &perms);
-      print_perms(perms, NULL);
-      return 0;
-    }
-    break;
   }
-}
-return 0;
+  return 0;
 }
