@@ -1,0 +1,4 @@
+(executable
+ (name nineteen_1)
+ (libraries core async async_inotify)
+ (preprocess (pps ppx_jane)))
