@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,9 +16,10 @@ int main() {
   sigemptyset(&s.sa_mask);
   s.sa_flags = 0;
   /* s.sa_flags = SA_NODEFER; */
-  /* s.sa_flags = SA_RESETHAND; */
+  s.sa_flags = SA_RESETHAND;
   sigaction(SIGTERM, &s, NULL);
-  pause();
-  pause();
+  while (true) {
+    pause();
+  }
   return 0;
 }
