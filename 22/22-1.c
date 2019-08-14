@@ -1,12 +1,10 @@
 #include <signal.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-void handler(int sig) {
-  printf("got signal %d\n", sig);
-}
+void handler(int sig) { printf("got signal %d\n", sig); }
 
 int main() {
   sigset_t signals;
